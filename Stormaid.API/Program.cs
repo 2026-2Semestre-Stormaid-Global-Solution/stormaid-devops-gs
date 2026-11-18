@@ -61,6 +61,7 @@ builder.Services.AddStormaidObservability(builder.Configuration);
 
 builder.Services.AddScoped<RescueUnitQueryService>();
 builder.Services.AddScoped<RescueUnitCommandService>();
+builder.Services.AddScoped<UnitAssignmentService>();
 builder.Services.AddScoped<IncidentCreatedEventService>();
 builder.Services.AddScoped<IncidentReferenceQueryService>();
 builder.Services.AddScoped<IncidentReferenceCommandService>();
@@ -184,6 +185,8 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 app.MapRegulationRoutes();
 
 app.MapRescueUnitRoutes();
+
+app.MapUnitAssignmentRoutes();
 
 app.MapCitizenIncidentTrackingRoutes();
 

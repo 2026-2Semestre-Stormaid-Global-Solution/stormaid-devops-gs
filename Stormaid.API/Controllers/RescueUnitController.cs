@@ -3,6 +3,7 @@ using Stormaid.Application.Services;
 using Stormaid.Application.DTOs.Request;
 using Stormaid.Application.Exceptions;
 using Stormaid.API.Hateoas;
+using Microsoft.EntityFrameworkCore;
 
 namespace Stormaid.API.Controllers;
 /// <summary>
@@ -79,6 +80,51 @@ public static class RescueUnitController
                 StatusCodes.Status401Unauthorized)
             .ProducesProblem(
                 StatusCodes.Status403Forbidden)
+            .ProducesProblem(
+                StatusCodes.Status409Conflict)
+            .ProducesProblem(
+                StatusCodes.Status429TooManyRequests);
+
+
+        group.MapPut("/{id:long}", UpdateAsync)
+            .WithName("UpdateRescueUnit")
+            .WithSummary("Atualizar unidade de resgate")
+            .WithDescription(
+                "Atualiza código, nome, instituição, capacidade e acessibilidade de uma unidade.")
+            .RequireAuthorization(policy =>
+                policy.RequireRole("REGULATOR"))
+            .Produces<RescueUnitResponse>(
+                StatusCodes.Status200OK)
+            .ProducesProblem(
+                StatusCodes.Status400BadRequest)
+            .ProducesProblem(
+                StatusCodes.Status401Unauthorized)
+            .ProducesProblem(
+                StatusCodes.Status403Forbidden)
+            .ProducesProblem(
+                StatusCodes.Status404NotFound)
+            .ProducesProblem(
+                StatusCodes.Status409Conflict)
+            .ProducesProblem(
+                StatusCodes.Status429TooManyRequests);
+
+        group.MapDelete("/{id:long}", DeleteAsync)
+            .WithName("DeleteRescueUnit")
+            .WithSummary("Excluir unidade de resgate")
+            .WithDescription(
+                "Remove uma unidade de resgate que não possua vínculos.")
+            .RequireAuthorization(policy =>
+                policy.RequireRole("REGULATOR"))
+            .Produces(
+                StatusCodes.Status204NoContent)
+            .ProducesProblem(
+                StatusCodes.Status400BadRequest)
+            .ProducesProblem(
+                StatusCodes.Status401Unauthorized)
+            .ProducesProblem(
+                StatusCodes.Status403Forbidden)
+            .ProducesProblem(
+                StatusCodes.Status404NotFound)
             .ProducesProblem(
                 StatusCodes.Status409Conflict)
             .ProducesProblem(
@@ -288,5 +334,97 @@ public static class RescueUnitController
         }
     }
 
+    /// <summary>
+    /// Atualiza os dados de uma unidade de resgate.
+    /// </summary>
+    private static async Task<IResult> UpdateAsync(
+        long id,
+        UpdateRescueUnitRequest request,
+        RescueUnitCommandService service,
+        CancellationToken cancellationToken)
+    {
+        if (id <= 0)
+        {
+            return Results.Problem(
+                title: "Identificador inválido.",
+                detail: "O identificador deve ser maior que zero.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
 
+        try
+        {
+            var updatedUnit = await service.UpdateAsync(
+                id,
+                request,
+                cancellationToken
+            );
+
+            if (updatedUnit is null)
+            {
+                return Results.Problem(
+                    title: "Unidade não encontrada.",
+                    statusCode: StatusCodes.Status404NotFound);
+            }
+
+            return Results.Ok(updatedUnit);
+        }
+        catch (RescueUnitCodeAlreadyExistsException ex)
+        {
+            return Results.Problem(
+                title: "Código de unidade duplicado.",
+                detail: ex.Message,
+                statusCode: StatusCodes.Status409Conflict
+            );
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.Problem(
+                title: "Dados inválidos.",
+                detail: ex.Message,
+                statusCode: StatusCodes.Status400BadRequest
+            );
+        }
+    }
+
+    /// <summary>
+    /// Exclui uma unidade de resgate sem vínculos.
+    /// </summary>
+    private static async Task<IResult> DeleteAsync(
+        long id,
+        RescueUnitCommandService service,
+        CancellationToken cancellationToken)
+    {
+        if (id <= 0)
+        {
+            return Results.Problem(
+                title: "Identificador inválido.",
+                detail: "O identificador deve ser maior que zero.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        try
+        {
+            var deleted = await service.DeleteAsync(
+                id,
+                cancellationToken
+            );
+
+            if (!deleted)
+            {
+                return Results.Problem(
+                    title: "Unidade não encontrada.",
+                    statusCode: StatusCodes.Status404NotFound);
+            }
+
+            return Results.NoContent();
+        }
+        catch (DbUpdateException)
+        {
+            return Results.Problem(
+                title: "Unidade possui vínculos.",
+                detail: "Remova os vínculos da unidade antes de excluí-la.",
+                statusCode: StatusCodes.Status409Conflict
+            );
+        }
+    }
 }
