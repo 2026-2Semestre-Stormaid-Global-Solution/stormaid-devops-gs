@@ -59,4 +59,32 @@ public sealed class FakeRescueUnitRepository : IRescueUnitRepository
             "Este fake suporta apenas operações de consulta."
         );
     }
+
+    public Task<bool> ExistsByUnitCodeExcludingIdAsync(
+        string unitCode,
+        long id,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException(
+            "Este fake suporta apenas operações de consulta."
+        );
+    }
+
+    public Task UpdateAsync(
+        RescueUnit unit,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException(
+            "Este fake suporta apenas operações de consulta."
+        );
+    }
+
+    public Task RemoveAsync(
+        RescueUnit unit,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException(
+            "Este fake suporta apenas operações de consulta."
+        );
+    }
 }
