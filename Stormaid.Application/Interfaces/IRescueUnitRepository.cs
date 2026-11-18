@@ -33,4 +33,20 @@ public interface IRescueUnitRepository
         RescueUnit unit,
         CancellationToken cancellationToken = default
     );
+
+    Task<bool> ExistsByUnitCodeExcludingIdAsync(
+        string unitCode,
+        long id,
+        CancellationToken cancellationToken = default
+    );
+
+    Task UpdateAsync(
+        RescueUnit unit,
+        CancellationToken cancellationToken = default
+    );
+
+    Task RemoveAsync(
+        RescueUnit unit,
+        CancellationToken cancellationToken = default
+    );
 }

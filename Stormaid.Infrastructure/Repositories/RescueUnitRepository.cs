@@ -87,4 +87,33 @@ public class RescueUnitRepository : IRescueUnitRepository
 
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<bool> ExistsByUnitCodeExcludingIdAsync(
+        string unitCode,
+        long id,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.Set<RescueUnit>()
+            .AsNoTracking()
+            .AnyAsync(
+                unit => unit.UnitCode == unitCode && unit.Id != id,
+                cancellationToken
+            );
+    }
+
+    public async Task UpdateAsync(
+        RescueUnit unit,
+        CancellationToken cancellationToken = default)
+    {
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RemoveAsync(
+        RescueUnit unit,
+        CancellationToken cancellationToken = default)
+    {
+        _context.Set<RescueUnit>().Remove(unit);
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
 }

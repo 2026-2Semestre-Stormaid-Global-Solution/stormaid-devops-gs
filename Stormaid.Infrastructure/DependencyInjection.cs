@@ -66,6 +66,10 @@ public static class DependencyInjection
             RescueUnitRepository>();
 
         services.AddScoped<
+            IUnitAssignmentRepository,
+            UnitAssignmentRepository>();
+
+        services.AddScoped<
             IOutboxMessageRepository,
             OutboxMessageRepository>();
 

@@ -54,6 +54,27 @@ public class UnitAssignment : Entity
         Version = 0;
     }
 
+    public void ChangeResponder(long responderUserId)
+    {
+        ValidateId(responderUserId, nameof(responderUserId));
+
+        if (Status == UnitAssignmentStatus.ENDED)
+        {
+            throw new InvalidOperationException(
+                "Ended assignments cannot be changed."
+            );
+        }
+
+        if (ResponderUserId == responderUserId)
+        {
+            return;
+        }
+
+        ResponderUserId = responderUserId;
+
+        Version = checked(Version + 1);
+    }
+
     public void End(DateTime utcNow)
     {
         if (Status == UnitAssignmentStatus.ENDED)

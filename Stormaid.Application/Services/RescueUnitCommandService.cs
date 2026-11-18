@@ -53,4 +53,78 @@ public sealed class RescueUnitCommandService
 
         return RescueUnitResponse.FromEntity(unit);
     }
+
+    public async Task<RescueUnitResponse?> UpdateAsync(
+        long id,
+        UpdateRescueUnitRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var unit = await _repository.GetTrackedByIdAsync(
+            id,
+            cancellationToken
+        );
+
+        if (unit is null)
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.UnitCode))
+        {
+            var normalizedCode = request.UnitCode.Trim();
+
+            var codeExists = await _repository.ExistsByUnitCodeExcludingIdAsync(
+                normalizedCode,
+                id,
+                cancellationToken
+            );
+
+            if (codeExists)
+            {
+                throw new RescueUnitCodeAlreadyExistsException(
+                    normalizedCode
+                );
+            }
+        }
+
+        unit.UpdateDetails(
+            request.UnitCode,
+            request.DisplayName,
+            request.InstitutionType,
+            request.Capacity,
+            request.SupportsAccessibleTransport,
+            DateTime.UtcNow
+        );
+
+        await _repository.UpdateAsync(
+            unit,
+            cancellationToken
+        );
+
+        return RescueUnitResponse.FromEntity(unit);
+    }
+
+    public async Task<bool> DeleteAsync(
+        long id,
+        CancellationToken cancellationToken = default)
+    {
+        var unit = await _repository.GetTrackedByIdAsync(
+            id,
+            cancellationToken
+        );
+
+        if (unit is null)
+        {
+            return false;
+        }
+
+        await _repository.RemoveAsync(
+            unit,
+            cancellationToken
+        );
+
+        return true;
+    }
 }

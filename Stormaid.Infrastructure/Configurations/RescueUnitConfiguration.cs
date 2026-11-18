@@ -9,7 +9,7 @@ public class RescueUnitConfiguration : IEntityTypeConfiguration<RescueUnit>
 {
     public void Configure(EntityTypeBuilder<RescueUnit> builder)
     {
-        builder.ToTable("TB_STORMAID_RESCUE_UNIT");
+        builder.ToTable("TB_STORMAID_RESCUE_UNIT_GS");
 
         builder.HasKey(x => x.Id);
 

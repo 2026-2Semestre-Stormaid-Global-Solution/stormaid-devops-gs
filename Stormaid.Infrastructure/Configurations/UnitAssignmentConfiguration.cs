@@ -13,7 +13,7 @@ public class UnitAssignmentConfiguration : IEntityTypeConfiguration<UnitAssignme
 
     public void Configure(EntityTypeBuilder<UnitAssignment> builder)
     {
-        builder.ToTable("TB_STORMAID_UNIT_ASSIGNMENT");
+        builder.ToTable("TB_STORMAID_UNIT_ASSIGNMENT_GS");
 
         builder.HasKey(x => x.Id);
 
