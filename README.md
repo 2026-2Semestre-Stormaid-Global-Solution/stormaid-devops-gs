@@ -44,7 +44,6 @@ A API .NET é responsável pela **gestão das ocorrências recebidas da API Java
 - [⚙️ Como Executar](#️-como-executar)
 - [🧪 Testes](#-testes)
 - [📈 Cobertura de Testes](#-cobertura-de-testes)
-- [🐳 Docker](#-docker)
 - [📌 Funcionalidades Implementadas](#-funcionalidades-implementadas)
 - [🌐 Ambiente Publicado](#-ambiente-publicado)
 - [⚠️ Limitações e Pendências](#️-limitações-e-pendências)
@@ -198,8 +197,6 @@ flowchart TD
 
 ```text
 Stormaid/
-├── Dockerfile
-├── .dockerignore
 ├── .gitignore
 ├── Stormaid.sln
 │
@@ -293,7 +290,6 @@ Stormaid/
 | **NUnit** | Testes de entidades de domínio |
 | **xUnit / Moq / WebApplicationFactory** | Testes de serviços e integração HTTP |
 | **Coverlet Collector** | Coleta de cobertura de testes |
-| **Docker** | Imagem de execução do backend |
 | **Render** | Hospedagem da API .NET |
 
 O projeto utiliza práticas como **Repository Pattern**, **Service Layer**, **injeção de dependência**, **validação de regras de domínio** e **controle de concorrência**.
@@ -1070,7 +1066,6 @@ dotnet ef migrations script 0 BaselineExistingOracleSchema \
 - SDK **.NET 10**;
 - Acesso a um schema **Oracle** provisionado com as tabelas do Storm Aid;
 - Segredo JWT compartilhado com a API Java, com pelo menos 32 bytes;
-- Opcionalmente, **Docker**;
 - Para integração por eventos, broker **RabbitMQ** com fila, exchange e bindings configurados;
 - Ferramenta `dotnet-ef` para tarefas de migrations.
 
@@ -1226,8 +1221,6 @@ Ignorados:      8
 | `RabbitMqOutboxPublisherIntegrationTests` | Mensagem persistente entregue e rejeição de mensagem sem rota | **2 aprovados, 0 falhas** |
 | `RabbitMqAckNackDlqIntegrationTests` | ACK, NACK com `requeue=true` e envio à DLQ com `requeue=false` | **3 aprovados, 0 falhas** |
 
-Os cinco testes foram executados com `STORMAID_RUN_RABBITMQ_TESTS=1`, contra o broker Docker de laboratório (AMQP na porta local `5673`). Não instanciam o fluxo de persistência Oracle. Com essa variável ausente ou diferente de `1`, são ignorados.
-
 As classes `IncidentDispatchCancelEndpointTests`, `IncidentDispatchHateoasEndpointTests` e `RescueUnitHateoasEndpointTests` verificam, respectivamente, autorização e respostas de cancelamento, links HATEOAS de despachos e navegação HATEOAS de unidades. Os testes HTTP usam dependências simuladas.
 
 **Não há nesta documentação uma nova execução consolidada da suíte inteira após esses cinco testes**; portanto, a soma dos resultados isolados não é apresentada como nova contagem geral.
@@ -1273,51 +1266,6 @@ Os relatórios são gerados sob diretórios `TestResults` dos projetos de testes
 
 ---
 
-## 🐳 Docker
-
-O repositório contém um **Dockerfile multi-stage** na raiz, com imagem de build `mcr.microsoft.com/dotnet/sdk:10.0` e imagem final `mcr.microsoft.com/dotnet/aspnet:10.0`.
-
-### Construir a imagem
-
-Na raiz da solução:
-
-```bash
-docker build -t stormaid-api:local .
-```
-
-### Executar a imagem
-
-O container utiliza a porta interna **10000**. Crie um arquivo local `.env.docker` **fora do versionamento Git** com os valores reais do ambiente:
-
-```dotenv
-ConnectionStrings__Oracle=STRING_DE_CONEXAO_ORACLE
-Jwt__Secret=SEGREDO_COMPARTILHADO_COM_O_JAVA
-OpenApi__Enabled=true
-RabbitMQ__Enabled=false
-OutboxPublisher__Enabled=false
-```
-
-Depois:
-
-```bash
-docker run --rm \
-  --name stormaid-api-local \
-  -p 10000:10000 \
-  --env-file .env.docker \
-  stormaid-api:local
-```
-
-A API ficará disponível em:
-
-```text
-http://localhost:10000
-http://localhost:10000/health/live
-http://localhost:10000/health/ready
-http://localhost:10000/swagger/index.html
-```
-
----
-
 ## 📌 Funcionalidades Implementadas
 
 - [x] API REST com ASP.NET Core Minimal API;
@@ -1344,7 +1292,6 @@ http://localhost:10000/swagger/index.html
 - [x] OpenTelemetry (traces e métricas) e exportação OTLP opcional de traces;
 - [x] Prometheus exporter e `/metrics` em `Development`;
 - [x] Testes automatizados de domínio, cancelamento, HATEOAS e integração RabbitMQ;
-- [x] Dockerfile multi-stage;
 - [x] Publicação HTTP da API no Render;
 
 ---
@@ -1363,7 +1310,7 @@ A API .NET do Storm Aid está publicada no **Render**.
 | ✅ **Readiness Oracle** | https://stormaid-dotnet-gs.onrender.com/health/ready |
 | 💻 **Repositório GitHub** | https://github.com/2026-2Semestre-Stormaid-Global-Solution/stormaid-dotnet-gs |
 
-A publicação utiliza **Docker**, **ASP.NET Core em ambiente Production**, **Oracle** para persistência e **Serilog** para registros no console do serviço. O painel Render exibiu **Deploy succeeded | Live** para o commit `9b9696e` em 16/11/2026. Isso confirma o deploy, não a execução de fluxos de negócio com Oracle ou a mensageria ponta a ponta.
+A publicação utiliza, **ASP.NET Core em ambiente Production**, **Oracle** para persistência e **Serilog** para registros no console do serviço. O painel Render exibiu **Deploy succeeded | Live** para o commit `9b9696e` em 16/11/2026. Isso confirma o deploy, não a execução de fluxos de negócio com Oracle ou a mensageria ponta a ponta.
 
 ### Variáveis de ambiente principais do Render
 
