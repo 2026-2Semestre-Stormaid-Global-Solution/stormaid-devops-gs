@@ -1,0 +1,182 @@
+# Storm Aid - Azure DevOps CI/CD
+# Executa CI/CD somente após merge na branch main.
+trigger:
+  branches:
+    include:
+      - main
+
+pr: none
+
+pool:
+  name: Default
+
+variables:
+  buildConfiguration: 'Release'
+  solution: 'Stormaid.sln'
+  apiProject: 'Stormaid.API/Stormaid.API.csproj'
+  artifactName: 'stormaid-api'
+  azureServiceConnection: 'azure-stormaid-gs'
+  webAppName: 'bsl-stormaid-gs'
+  appType: 'webApp'
+stages:
+- stage: CI
+  displayName: 'CI - Build, testes e artefato'
+  jobs:
+  - job: BuildAndTest
+    displayName: 'Restaurar, compilar e testar'
+    steps:
+    - checkout: self
+      clean: true
+
+    - task: UseDotNet@2
+      displayName: 'Instalar .NET SDK 10'
+      inputs:
+        packageType: 'sdk'
+        version: '10.x'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Restaurar solução'
+      inputs:
+        command: 'restore'
+        projects: '$(solution)'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Build Release'
+      inputs:
+        command: 'build'
+        projects: '$(solution)'
+        arguments: '--configuration $(buildConfiguration) --no-restore'
+
+# ================================
+# Testes de domínio NUnit
+# ================================
+    - task: DotNetCoreCLI@2
+      displayName: 'Testes de domínio (NUnit)'
+      inputs:
+        command: 'test'
+        projects: 'Stormaid.Domain.Tests/Stormaid.Domain.Tests.csproj'
+        arguments: '--configuration $(buildConfiguration) --no-build --logger "trx;LogFileName=domain-tests.trx" --results-directory "$(Agent.TempDirectory)/StormAid-TestResults/Domain"'
+        publishTestResults: false
+
+    - task: PublishTestResults@2
+      displayName: 'Publicar resultado NUnit'
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFormat: 'VSTest'
+        testResultsFiles: '$(Agent.TempDirectory)/StormAid-TestResults/Domain/**/*.trx'
+        searchFolder: '$(Agent.TempDirectory)/StormAid-TestResults/Domain'
+        mergeTestResults: true
+        failTaskOnFailedTests: true
+        testRunTitle: 'Storm Aid - NUnit Domain'
+
+# ================================
+# Testes HTTP/integração xUnit. Testes que exigem Oracle/RabbitMQ real
+# ================================
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Testes de API (xUnit)'
+      inputs:
+        command: 'test'
+        projects: 'tests/Stormaid.API.IntegrationTests/Stormaid.API.IntegrationTests.csproj'
+        arguments: '--configuration $(buildConfiguration) --no-build --logger "trx;LogFileName=api-tests.trx" --results-directory "$(Agent.TempDirectory)/StormAid-TestResults/API"'
+        publishTestResults: false
+
+    - task: PublishTestResults@2
+      displayName: 'Publicar resultado xUnit'
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFormat: 'VSTest'
+        testResultsFiles: '$(Agent.TempDirectory)/StormAid-TestResults/API/**/*.trx'
+        searchFolder: '$(Agent.TempDirectory)/StormAid-TestResults/API'
+        mergeTestResults: true
+        failTaskOnFailedTests: true
+        testRunTitle: 'Storm Aid - xUnit API'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Publicar API .NET'
+      inputs:
+        command: 'publish'
+        publishWebProjects: false
+        projects: '$(apiProject)'
+        arguments: '--configuration $(buildConfiguration) --output "$(Build.ArtifactStagingDirectory)/publish"'
+        zipAfterPublish: false
+        modifyOutputPath: false
+
+    - task: ArchiveFiles@2
+      displayName: 'Criar pacote ZIP para deploy'
+      inputs:
+        rootFolderOrFile: '$(Build.ArtifactStagingDirectory)/publish'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/$(artifactName).zip'
+        replaceExistingArchive: true
+
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publicar artefato da CI'
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/$(artifactName).zip'
+        artifact: '$(artifactName)'
+        publishLocation: 'pipeline'
+
+- stage: CD
+  displayName: 'CD - Deploy no Azure App Service'
+  dependsOn: CI
+  condition: succeeded()
+  jobs:
+  - deployment: DeployStormAid
+    displayName: 'Deploy da API Storm Aid'
+    environment: 'stormaid-azure'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: '$(artifactName)'
+
+          - task: AzureAppServiceSettings@1
+            displayName: 'Configurar App Settings do Azure'
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              appName: '$(webAppName)'
+              appSettings: |
+                [
+                  {
+                    "name": "ASPNETCORE_ENVIRONMENT",
+                    "value": "Production",
+                    "slotSetting": false
+                  },
+                  {
+                    "name": "ConnectionStrings__Oracle",
+                    "value": "$(OracleConnection)",
+                    "slotSetting": false
+                  },
+                  {
+                    "name": "Jwt__Secret",
+                    "value": "$(JwtSecret)",
+                    "slotSetting": false
+                  },
+                  {
+                    "name": "OpenApi__Enabled",
+                    "value": "true",
+                    "slotSetting": false
+                  },
+                  {
+                    "name": "RabbitMQ__Enabled",
+                    "value": "false",
+                    "slotSetting": false
+                  },
+                  {
+                    "name": "OutboxPublisher__Enabled",
+                    "value": "false",
+                    "slotSetting": false
+                  }
+                ]
+
+          - task: AzureWebApp@1
+            displayName: 'Deploy ZIP no Azure Web App'
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              appType: '$(appType)'
+              appName: '$(webAppName)'
+              package: '$(Pipeline.Workspace)/$(artifactName)/$(artifactName).zip'
+              deploymentMethod: 'zipDeploy'
